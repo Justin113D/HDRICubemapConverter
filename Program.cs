@@ -1,60 +1,81 @@
 ﻿using SimpleImageIO;
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Numerics;
-using System.Runtime.Intrinsics;
 
 namespace HDRICubemapConverter
 {
     internal class Program
     {
+        static void PrintHelp()
+        {
+            Console.WriteLine("HDRI / Cubemap converter 1.0.1 - @Justin113D");
+            Console.WriteLine();
+            Console.WriteLine("Usages:");
+            Console.WriteLine("  HDRICubemapConverter hdri [in_cubemap_layout] [filepath] <outpath>");
+            Console.WriteLine("  HDRICubemapConverter [out_cubemap_layout] [filepath] <outpath>");
+            Console.WriteLine();
+            Console.WriteLine("If no outpath is provided, then the output file will use the input filepath + the target layout.");
+            Console.WriteLine("  e.g.: image.hdr -> image_HDRI.hdr");
+            Console.WriteLine();
+            Console.WriteLine("Cubemap layouts:");
+            Console.WriteLine("  - line: cube sides in a horizontal line:");
+            Console.WriteLine("            -X+X-Y+Y-Z+Z");
+            Console.WriteLine("  - cube: traditional origami-like layout:");
+            Console.WriteLine("            __+Y____");
+            Console.WriteLine("            -X+Z+X-Z");
+            Console.WriteLine("            __-Y____");
+            Console.WriteLine();
+        }
+
         static void Main(string[] args)
         {
             if(args.Length < 2)
             {
-                Console.WriteLine("HDRI / HDR Cubemap converter 1.0.0 - @Justin113D");
-                Console.WriteLine();
-                Console.WriteLine("Usages:");
-                Console.WriteLine("  HDRICubemapConverter hdri [input cubemap layout] [input cubemap filepath]");
-                Console.WriteLine("  HDRICubemapConverter [output cubemap layout] [input hdri filepath]");
-                Console.WriteLine();
-                Console.WriteLine("Cubemap layouts:");
-                Console.WriteLine("  - line: cube sides in a horizontal line:");
-                Console.WriteLine("            -X+X-Y+Y-Z+Z");
-                Console.WriteLine("  - cube: traditional origami-like layout:");
-                Console.WriteLine("            __+Y____");
-                Console.WriteLine("            -X+Z+X-Z");
-                Console.WriteLine("            __-Y____");
-                Console.WriteLine();
+                PrintHelp();
                 return;
             }
 
-            string targetType, filepath, cubemapLayout;
 
-            targetType = args[0].ToLower();
+            string targetType = args[0].ToLower();
+            int fileArgIndex = 1;
+            string cubemapLayout = string.Empty;
 
-            if(args.Length == 3)
+            if(targetType == "hdri")
             {
+                if(args.Length < 3)
+                {
+                    PrintHelp();
+                    return;
+                }
+
                 cubemapLayout = args[1].ToLower();
-                filepath = args[2];
-            }
-            else
-            {
-                cubemapLayout = "line";
-                filepath = args[1];
+                if(cubemapLayout is not "line" and not "cube")
+                {
+                    Console.WriteLine("Invalid cubemap layout! Needs to be either line or cube!");
+                    return;
+                }
+
+                fileArgIndex = 2;
             }
 
+            string filepath = args[fileArgIndex];
             if(!File.Exists(filepath))
             {
                 Console.WriteLine("Invalid filepath!");
                 return;
             }
 
-            if(cubemapLayout is not "line" and not "cube")
+            string outpath;
+            if(args.Length > fileArgIndex + 1)
             {
-                Console.WriteLine("Invalid cubemap layout! Needs to be either \"line\" or \"cube\"!");
-                return;
+                outpath = args[fileArgIndex + 1];
+            }
+            else
+            {
+                int extensionIndex = filepath.IndexOf('.');
+                outpath = filepath[..extensionIndex] + "_" + targetType.ToUpper() + filepath[extensionIndex..];
+
             }
 
             Image source = new(filepath);
@@ -70,13 +91,11 @@ namespace HDRICubemapConverter
                     output = HDRIToCubemap(source, targetType);
                     break;
                 default:
-                    Console.WriteLine("Invalid target type!");
+                    Console.WriteLine("Invalid target type! Needs to be one of: hdri, line, cube");
                     return;
             }
 
-            int extensionIndex = filepath.IndexOf('.');
-            string outputFilepath = filepath[..extensionIndex] + "_" + args[0].ToUpper() + filepath[extensionIndex..];
-            output.WriteToFile(outputFilepath);
+            output.WriteToFile(outpath);
         }
 
         public static Image HDRIToCubemap(Image source, string cubemapLayout)
